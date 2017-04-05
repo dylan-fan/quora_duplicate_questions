@@ -1,2 +1,2 @@
 # quora_duplicate_questions
-detection quora duplicate question
+detection quora duplicate question针对pair对，采用dnn识别重复文档
