@@ -15,7 +15,7 @@ Date:    2017/04/04 11:34:00
 
 # from gensim.models import Word2Vec
 from keras.callbacks import ModelCheckpoint
-from keras.layers import Dense, Merge, Dropout
+from keras.layers import Dense, Merge, Dropout, Flatten, Reshape
 from keras.layers.embeddings import Embedding
 from keras.layers.recurrent import LSTM
 from keras.models import Sequential
@@ -65,21 +65,31 @@ def model(in_file):
     # 建立模型；
     print("Building model...")
     ques1_enc = Sequential()
-    ques1_enc.add(Embedding(output_dim=EMBED_DIM, input_dim=vocab_size,
-                       weights=[embedding_weights], mask_zero=True))
-    ques1_enc.add(LSTM(HIDDEN_DIM, input_shape=(EMBED_DIM, seq_maxlen), 
-                       return_sequences=False))
+    ques1_enc.add(Embedding(output_dim=EMBED_DIM, 
+                            input_dim=vocab_size,
+                            input_length=seq_maxlen,
+                       weights=[embedding_weights]))
+    ques1_enc.add(LSTM(HIDDEN_DIM,  return_sequences=True))
     ques1_enc.add(Dropout(0.3))
     
     ques2_enc = Sequential()
-    ques2_enc.add(Embedding(output_dim=EMBED_DIM, input_dim=vocab_size,
-                       weights=[embedding_weights], mask_zero=True))
-    ques2_enc.add(LSTM(HIDDEN_DIM, input_shape=(EMBED_DIM, seq_maxlen), 
-                       return_sequences=False))
+    ques2_enc.add(Embedding(output_dim=EMBED_DIM, 
+                            input_dim=vocab_size,
+                            input_length=seq_maxlen,
+                       weights=[embedding_weights]))
+    ques2_enc.add(LSTM(HIDDEN_DIM, return_sequences=True))
     ques2_enc.add(Dropout(0.3))
     
+    # attention model
+    attn = Sequential()
+    attn.add(Merge([ques1_enc, ques2_enc], mode="dot", dot_axes=[1, 1]))
+    attn.add(Flatten())
+    attn.add(Dense((seq_maxlen * HIDDEN_DIM)))
+    attn.add(Reshape((seq_maxlen, HIDDEN_DIM)))
+    
     model = Sequential()
-    model.add(Merge([ques1_enc, ques2_enc], mode="sum"))
+    model.add(Merge([ques1_enc, attn], mode="sum"))
+    model.add(Flatten())
     model.add(Dense(2, activation="softmax"))
     
     model.compile(optimizer="adam", loss="categorical_crossentropy",
@@ -87,11 +97,10 @@ def model(in_file):
     
     print("Training...")
     checkpoint = ModelCheckpoint(
-        filepath=os.path.join(MODEL_DIR, "quora_dul_best_lstm.hdf5"),
+        filepath=os.path.join(MODEL_DIR, "quora_dul_best_lstm_atten.hdf5"),
         verbose=1, save_best_only=True)
     model.fit([x_ques1train, x_ques2train], ytrain, batch_size=BATCH_SIZE,
-              epochs=NBR_EPOCHS, 
-              validation_split=0.1,
+              epochs=NBR_EPOCHS, validation_split=0.1,
               verbose=2,
               callbacks=[checkpoint])
     
@@ -104,11 +113,11 @@ def model(in_file):
     loss, acc = model.evaluate([x_ques1test, x_ques2test], ytest, batch_size=BATCH_SIZE)
     print("Test loss/accuracy final model = %.4f, %.4f" % (loss, acc))
     
-    model.save_weights(os.path.join(MODEL_DIR, "quora_dul_lstm-final.hdf5"))
+    model.save_weights(os.path.join(MODEL_DIR, "quora_dul_lstm_atten-final.hdf5"))
     with open(os.path.join(MODEL_DIR, "quora_dul_lstm.json"), "wb") as fjson:
         fjson.write(model.to_json())
     
-    model.load_weights(filepath=os.path.join(MODEL_DIR, "quora_dul_best_lstm.hdf5"))
+    model.load_weights(filepath=os.path.join(MODEL_DIR, "quora_dul_best_lstm_atten.hdf5"))
     loss, acc = model.evaluate([x_ques1test, x_ques2test], ytest, batch_size=BATCH_SIZE)
     print("Test loss/accuracy best model = %.4f, %.4f" % (loss, acc))
     
