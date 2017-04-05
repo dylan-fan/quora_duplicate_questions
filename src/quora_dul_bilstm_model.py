@@ -7,7 +7,7 @@
 #
 ################################################################################
 """
-该模块对quora 重复文档进行数据处理；
+该模块对quora 重复文档进行识别，采用bilstm模型；
 
 Authors: Fan Tao (fantao@mail.ustc.edu.cn)
 Date:    2017/04/04 11:34:00
@@ -35,7 +35,7 @@ NBR_EPOCHS = 1
 MODEL_DIR="../data/"
 
 def model(in_file):
-    """ 判断文档是否重复的lstm模型；
+    """ 判断文档是否重复的bilstm模型；
     """
     # 数据预处理阶段；
     print("data process...")
